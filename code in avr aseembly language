@@ -1,0 +1,92 @@
+;==============================================================
+; SIMPLE FLAME DETECTION SYSTEM FOR ATMEGA32
+;
+; Connections:
+; - Flame Sensor -> PA0
+; - LED -> PB0
+; - Buzzer -> PB1
+;==============================================================
+
+.include "m32def.inc"    ; Include ATmega32 definitions
+
+; Define our pins for clarity
+.equ FLAME_PIN = 0       ; Flame sensor on PA0
+.equ LED_PIN = 0         ; LED on PB0
+.equ BUZZER_PIN = 1      ; Buzzer on PB1
+
+; Register assignments
+.def temp = r16          ; Temporary register for general use
+
+;==============================================================
+; PROGRAM START
+;==============================================================
+.org 0x0000              ; Start address after reset
+    rjmp START           ; Jump to our program start
+
+START:
+    ; Set up stack pointer (needed for any subroutine calls)
+    ldi temp, high(RAMEND)
+    out SPH, temp
+    ldi temp, low(RAMEND)
+    out SPL, temp
+    
+    ; SETUP PORTS
+    ; -----------------------------------------------------
+    ; Setup PA0 (flame sensor) as INPUT with pull-up
+    cbi DDRA, FLAME_PIN      ; Clear bit = set as input
+    sbi PORTA, FLAME_PIN     ; Set bit = enable pull-up resistor
+    
+    ; Setup PB0 (LED) and PB1 (Buzzer) as OUTPUTS
+    sbi DDRB, LED_PIN        ; Set bit = set as output
+    sbi DDRB, BUZZER_PIN     ; Set bit = set as output
+    
+    ; Make sure outputs start OFF
+    cbi PORTB, LED_PIN       ; Clear bit = LED off
+    cbi PORTB, BUZZER_PIN    ; Clear bit = buzzer off
+
+;==============================================================
+; MAIN PROGRAM LOOP
+;==============================================================
+MAIN_LOOP:
+    ; Check flame sensor (PA0)
+    sbis PINA, FLAME_PIN     ; Skip if bit is set (1 = no flame)
+    rjmp FLAME_DETECTED      ; If we didn't skip, flame detected!
+    
+    ; No flame detected - turn everything off
+    cbi PORTB, LED_PIN       ; LED off
+    cbi PORTB, BUZZER_PIN    ; Buzzer off
+    rjmp DELAY               ; Go to delay
+
+FLAME_DETECTED:
+    ; Turn on LED when flame detected
+    sbi PORTB, LED_PIN
+    
+    ; Create beeping sound with buzzer
+    sbi PORTB, BUZZER_PIN    ; Buzzer on
+    rcall SHORT_DELAY        ; Wait a moment
+    cbi PORTB, BUZZER_PIN    ; Buzzer off
+    rcall SHORT_DELAY        ; Wait a moment
+    
+DELAY:
+    ; A simple delay to slow down our loop
+    rcall LONG_DELAY
+    rjmp MAIN_LOOP           ; Repeat forever
+
+;==============================================================
+; DELAY SUBROUTINES
+;==============================================================
+SHORT_DELAY:                 ; About 100ms delay
+    ldi r20, 100
+SHORT_OUTER:
+    ldi r21, 255
+SHORT_INNER:
+    dec r21
+    brne SHORT_INNER
+    dec r20
+    brne SHORT_OUTER
+    ret
+
+LONG_DELAY:                  ; About 200ms delay
+    rcall SHORT_DELAY
+    rcall SHORT_DELAY
+    ret
